@@ -1,0 +1,374 @@
+
+/* =========================================
+   WHAT TO-DO? — NEOBRUTALISM UI
+========================================= */
+
+/* GLOBAL RESET */
+
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    padding: 0;
+}
+
+/* MAIN APPLICATION */
+
+.app-container {
+    min-height: 100vh;
+    width: 100%;
+    padding: 35px 24px 120px;
+    background-color: #F5F1E8;
+    color: #1C1C1C;
+    font-family: Arial, sans-serif;
+}
+
+/* HEADER */
+
+.app-header {
+    width: 100%;
+    max-width: none;
+    margin: 0 0 55px;
+
+    display: grid;
+    grid-template-columns: 85px 1fr 85px;
+    grid-template-rows: auto auto;
+    align-items: center;
+    text-align: center;
+    row-gap: 12px;
+}
+
+/* TOP-LEFT LOGO */
+
+.app-logo {
+    grid-column: 1;
+    grid-row: 1;
+
+    display: block;
+    width: 75px;
+    height: auto;
+    object-fit: contain;
+    justify-self: start;
+}
+
+/* CENTERED HEADING */
+
+.header-title {
+    grid-column: 2;
+    grid-row: 1;
+    text-align: center;
+}
+
+.header-title h1 {
+    margin: 0;
+    font-size: clamp(36px, 5vw, 58px);
+    font-weight: 900;
+    letter-spacing: -2px;
+    line-height: 1.15;
+    color: #1C1C1C;
+}
+
+/* BALANCES THE HEADER GRID */
+
+.header-spacer {
+    grid-column: 3;
+    grid-row: 1;
+}
+
+/* TAGLINE */
+
+.app-header p {
+    grid-column: 1 / 4;
+    grid-row: 2;
+
+    margin: 0;
+    padding: 0;
+    font-size: 19px;
+    font-weight: 700;
+    line-height: 1.5;
+    text-align: center;
+}
+
+/* MAIN CONTENT */
+
+.todo-section {
+    width: 100%;
+    max-width: 650px;
+    margin: 0 auto;
+}
+
+/* INPUT FORM */
+
+.todo-form {
+    width: 100%;
+    display: flex;
+    align-items: stretch;
+    gap: 12px;
+    margin-bottom: 35px;
+}
+
+.todo-form input {
+    flex: 1;
+    min-width: 0;
+    padding: 16px;
+    background-color: #FFFFFF;
+    color: #1C1C1C;
+    border: 3px solid #1C1C1C;
+    border-radius: 6px;
+    font-size: 16px;
+    font-weight: 600;
+    outline: none;
+}
+
+.todo-form input:focus {
+    box-shadow: 4px 4px 0 #F5D547;
+}
+
+/* ADD TASK BUTTON */
+
+.todo-form button {
+    padding: 14px 22px;
+    background-color: #F5D547;
+    color: #1C1C1C;
+    border: 3px solid #1C1C1C;
+    border-radius: 6px;
+    font-size: 15px;
+    font-weight: 800;
+    cursor: pointer;
+    box-shadow: 4px 4px 0 #1C1C1C;
+    transition: 0.15s ease;
+}
+
+.todo-form button:hover {
+    transform: translate(3px, 3px);
+    box-shadow: 1px 1px 0 #1C1C1C;
+}
+
+/* TASK LIST CONTAINER */
+
+.todo-list {
+    width: 100%;
+    background-color: #FFFFFF;
+    padding: 25px;
+    border: 3px solid #1C1C1C;
+    border-radius: 8px;
+    box-shadow: 7px 7px 0 #1C1C1C;
+}
+
+.todo-list h2 {
+    margin: 0 0 18px;
+    font-size: 23px;
+    font-weight: 900;
+}
+
+.todo-list ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+/* INDIVIDUAL TASKS */
+
+.todo-list li {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    padding: 15px 0;
+    border-bottom: 2px solid #E5E5E5;
+    font-weight: 700;
+    overflow-wrap: anywhere;
+}
+
+.todo-list li:last-child {
+    border-bottom: none;
+}
+
+.todo-list li p {
+    margin: 6px 0 0;
+    font-size: 13px;
+    font-weight: 500;
+}
+
+/* TASK BUTTONS */
+
+.todo-list li button {
+    flex-shrink: 0;
+    padding: 8px 13px;
+    background-color: #FF9999;
+    color: #1C1C1C;
+    border: 2px solid #1C1C1C;
+    border-radius: 5px;
+    font-weight: 800;
+    cursor: pointer;
+    transition: 0.15s ease;
+}
+
+.todo-list li button:hover {
+    background-color: #FF7070;
+    transform: translate(2px, 2px);
+}
+
+/* EMPTY TASK MESSAGE */
+
+.todo-list > p {
+    margin: 15px 0 0;
+    font-weight: 600;
+    text-align: center;
+}
+
+/* =========================================
+   FIXED FOOTER
+========================================= */
+
+.app-footer {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    z-index: 1000;
+
+    padding: 14px 15px;
+    background-color: #F5F1E8;
+    border-top: 2px solid #1C1C1C;
+
+    text-align: center;
+}
+
+.app-footer p {
+    margin: 0;
+    color: #303030;
+    font-size: 13px;
+    font-weight: 500;
+    line-height: 1.6;
+}
+
+.app-footer strong {
+    color: #1C1C1C;
+    font-weight: 900;
+}
+
+.footer-credit {
+    margin-top: 3px !important;
+    font-size: 12px !important;
+}
+
+/* =========================================
+   TABLETS
+========================================= */
+
+@media (max-width: 768px) {
+
+    .app-container {
+        padding: 30px 18px 120px;
+    }
+
+    .app-header {
+        grid-template-columns: 65px 1fr 65px;
+        margin-bottom: 45px;
+    }
+
+    .app-logo {
+        width: 60px;
+    }
+
+    .header-title h1 {
+        font-size: clamp(32px, 5vw, 44px);
+    }
+
+    .todo-section {
+        max-width: 600px;
+    }
+}
+
+/* =========================================
+   MOBILE DEVICES
+========================================= */
+
+@media (max-width: 600px) {
+
+    .app-container {
+        padding: 22px 16px 110px;
+    }
+
+    .app-header {
+        grid-template-columns: 50px 1fr 50px;
+        row-gap: 10px;
+        margin-bottom: 40px;
+    }
+
+    .app-logo {
+        width: 46px;
+    }
+
+    .header-title h1 {
+        font-size: clamp(25px, 6vw, 36px);
+        letter-spacing: -1.5px;
+    }
+
+    .app-header p {
+        font-size: 15px;
+    }
+
+    .todo-form {
+        flex-direction: column;
+    }
+
+    .todo-form input,
+    .todo-form button {
+        width: 100%;
+    }
+
+    .todo-list {
+        padding: 18px;
+        box-shadow: 5px 5px 0 #1C1C1C;
+    }
+
+    .todo-list h2 {
+        font-size: 20px;
+    }
+
+    .todo-list li {
+        font-size: 14px;
+    }
+
+    /* MOBILE FOOTER */
+
+    .app-footer {
+        padding: 10px;
+    }
+
+    .app-footer p {
+        font-size: 11px;
+    }
+
+    .footer-credit {
+        font-size: 10px !important;
+    }
+}
+
+/* =========================================
+   SMALL MOBILE SCREENS
+========================================= */
+
+@media (max-width: 380px) {
+
+    .app-header {
+        grid-template-columns: 42px 1fr 42px;
+    }
+
+    .app-logo {
+        width: 40px;
+    }
+
+    .header-title h1 {
+        font-size: 25px;
+        letter-spacing: -1px;
+    }
+
+    .todo-list li {
+        flex-wrap: wrap;
+    }
+}
