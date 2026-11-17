@@ -207,5 +207,3 @@ Frontend Developer | Creative Professional
 ### 📝 WHAT TO-DO?
 
 **Organize. Prioritize. Accomplish.**
-
-Made with ❤️ and React.
