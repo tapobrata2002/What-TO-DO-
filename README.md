@@ -202,5 +202,10 @@ Frontend Developer | Creative Professional
 - GitHub: [tapobrata2002](https://github.com/tapobrata2002)
 
 ---
+---
 
-\<p align="center">   \<strong>WHAT TO-DO?\</strong>   \<br/>   Organize. Prioritize. Accomplish.   \<br/>\<br/>   Made with ❤️ and React. \</p>
+### 📝 WHAT TO-DO?
+
+**Organize. Prioritize. Accomplish.**
+
+Made with ❤️ and React.
