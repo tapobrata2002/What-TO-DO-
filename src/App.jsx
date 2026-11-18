@@ -1,78 +1,104 @@
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import './App.css';
 
+import TaskSearch from './components/TaskSearch';
+
+import {
+    getToday,
+    formatDate,
+    formatDisplayDate,
+    generateCalendarDays
+} from './utils/dateHelpers';
+
+import {
+    createId,
+    normalizeTasks,
+    isOverdue
+} from './utils/taskHelpers';
+
+import {
+    drawProductivityCard as drawProductivityCardToCanvas
+} from './utils/reportCanvas';
+
+const STORAGE_KEY = 'what-to-do-tasks';
+
 function App() {
-
-    // =========================================
-    // DATE FUNCTIONS
-    // =========================================
-
-    const getToday = () => {
-        const date = new Date();
-
-        const year = date.getFullYear();
-        const month = String(date.getMonth() + 1).padStart(2, '0');
-        const day = String(date.getDate()).padStart(2, '0');
-
-        return `${year}-${month}-${day}`;
-    };
-
     const today = getToday();
 
-    const formatDate = (date) => {
-        const year = date.getFullYear();
-        const month = String(date.getMonth() + 1).padStart(2, '0');
-        const day = String(date.getDate()).padStart(2, '0');
-
-        return `${year}-${month}-${day}`;
-    };
-
-    const formatDisplayDate = (date) => {
-        if (!date) return 'Choose a due date';
-
-        const [year, month, day] = date.split('-').map(Number);
-
-        return new Date(year, month - 1, day).toLocaleDateString(
-            'en-US',
-            {
-                month: 'short',
-                day: 'numeric',
-                year: 'numeric'
-            }
-        );
-    };
-
-
     // =========================================
-    // STATES
+    // TASK STORAGE
     // =========================================
 
     const [todos, setTodos] = useState(() => {
         try {
-            const savedTodos = localStorage.getItem('what-to-do-tasks');
-            return savedTodos ? JSON.parse(savedTodos) : [];
-        } catch {
+            const savedTodos = localStorage.getItem(STORAGE_KEY);
+
+            if (!savedTodos) return [];
+
+            return normalizeTasks(JSON.parse(savedTodos));
+        } catch (error) {
+            console.error('Could not read saved tasks:', error);
             return [];
         }
     });
 
-    // Main page states
+    const [storageError, setStorageError] = useState(false);
+
+    useEffect(() => {
+        try {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(todos));
+            setStorageError(false);
+        } catch (error) {
+            console.error('Could not save tasks:', error);
+            setStorageError(true);
+        }
+    }, [todos]);
+
+    // =========================================
+    // TASK FORM STATES
+    // =========================================
+
     const [input, setInput] = useState('');
     const [dueDate, setDueDate] = useState('');
+    const [priorityLevel, setPriorityLevel] = useState(3);
+    const [editingTaskId, setEditingTaskId] = useState(null);
+
+    const resetTaskForm = () => {
+        setInput('');
+        setDueDate('');
+        setPriorityLevel(3);
+        setEditingTaskId(null);
+    };
+
+    // =========================================
+    // NAVIGATION AND PANEL STATES
+    // =========================================
+
     const [activeView, setActiveView] = useState('tasks');
-
-    // Pending panel
     const [showPendingTasks, setShowPendingTasks] = useState(false);
+    const [showExport, setShowExport] = useState(false);
+    const [showSearchTools, setShowSearchTools] = useState(false);
 
-    // Calendar states
+    // =========================================
+    // SEARCH, FILTER AND SORT STATES
+    // =========================================
+
+    const [searchQuery, setSearchQuery] = useState('');
+    const [statusFilter, setStatusFilter] = useState('all');
+    const [priorityFilter, setPriorityFilter] = useState('all');
+    const [sortBy, setSortBy] = useState('default');
+
+    // =========================================
+    // CALENDAR STATES
+    // =========================================
+
     const [visibleMonth, setVisibleMonth] = useState(() => {
         const date = new Date();
         return new Date(date.getFullYear(), date.getMonth(), 1);
     });
 
     const [selectedDate, setSelectedDate] = useState(today);
-
     const [calendarOpen, setCalendarOpen] = useState(false);
 
     const [pickerMonth, setPickerMonth] = useState(() => {
@@ -80,41 +106,31 @@ function App() {
         return new Date(date.getFullYear(), date.getMonth(), 1);
     });
 
-    // Productivity export states
-    const [showExport, setShowExport] = useState(false);
+    // =========================================
+    // PRODUCTIVITY REPORT STATES
+    // =========================================
+
     const [exportPeriod, setExportPeriod] = useState('weekly');
     const [reportDate, setReportDate] = useState(() => new Date());
 
-    // Canvas reference
     const reportCanvasRef = useRef(null);
 
-
     // =========================================
-    // LOCAL STORAGE
-    // =========================================
-
-    useEffect(() => {
-        localStorage.setItem(
-            'what-to-do-tasks',
-            JSON.stringify(todos)
-        );
-    }, [todos]);
-
-
-    // =========================================
-    // TASK FUNCTIONS
+    // TASK CREATION
     // =========================================
 
     const addTask = (date = dueDate) => {
-        if (input.trim() === '') return;
+        if (!input.trim()) return;
 
         const newTodo = {
-            id: Date.now(),
+            id: createId(),
             text: input.trim(),
             date,
             completed: false,
-            priority: 'Medium',
-            category: 'Personal'
+            priorityLevel,
+            pinned: false,
+            createdAt: new Date().toISOString(),
+            completedAt: null
         };
 
         setTodos((previousTodos) => [
@@ -122,67 +138,158 @@ function App() {
             newTodo
         ]);
 
-        setInput('');
-        setDueDate('');
+        resetTaskForm();
         setCalendarOpen(false);
     };
+
+    // =========================================
+    // TASK EDITING
+    // =========================================
+
+    const startEditingTask = (todo) => {
+        setEditingTaskId(todo.id);
+        setInput(todo.text);
+        setDueDate(todo.date || '');
+        setPriorityLevel(todo.priorityLevel || 3);
+
+        setActiveView('tasks');
+        setCalendarOpen(false);
+
+        window.scrollTo({
+            top: 0,
+            behavior: 'smooth'
+        });
+    };
+
+    const saveEditedTask = () => {
+        if (!input.trim() || editingTaskId === null) return;
+
+        setTodos((previousTodos) =>
+            previousTodos.map((todo) =>
+                todo.id === editingTaskId
+                    ? {
+                        ...todo,
+                        text: input.trim(),
+                        date: dueDate,
+                        priorityLevel
+                    }
+                    : todo
+            )
+        );
+
+        resetTaskForm();
+    };
+
+    const handleTaskSubmit = (date = dueDate) => {
+        if (editingTaskId !== null) {
+            saveEditedTask();
+        } else {
+            addTask(date);
+        }
+    };
+
+    // =========================================
+    // TASK COMPLETION
+    // =========================================
+
+    const toggleTask = (id) => {
+        setTodos((previousTodos) =>
+            previousTodos.map((todo) => {
+                if (todo.id !== id) return todo;
+
+                const nextCompleted = !todo.completed;
+
+                return {
+                    ...todo,
+                    completed: nextCompleted,
+                    completedAt: nextCompleted
+                        ? new Date().toISOString()
+                        : null
+                };
+            })
+        );
+    };
+
+    // =========================================
+    // TASK DELETION
+    // =========================================
 
     const deleteTask = (id) => {
         setTodos((previousTodos) =>
             previousTodos.filter((todo) => todo.id !== id)
         );
+
+        if (editingTaskId === id) {
+            resetTaskForm();
+        }
     };
 
-    const toggleTask = (id) => {
+    // =========================================
+    // TASK PINNING
+    // =========================================
+
+    const togglePin = (id) => {
         setTodos((previousTodos) =>
             previousTodos.map((todo) =>
                 todo.id === id
-                    ? { ...todo, completed: !todo.completed }
+                    ? { ...todo, pinned: !todo.pinned }
                     : todo
             )
         );
     };
 
+    // =========================================
+    // PRIORITY SELECTOR
+    // =========================================
+
+    const renderPrioritySelector = () => (
+        <div className="priority-level-selector">
+            <span className="priority-level-label">
+                PRIORITY LEVELS
+            </span>
+
+            <div
+                className="priority-level-stars"
+                role="group"
+                aria-label="Choose task priority"
+            >
+                {[1, 2, 3, 4, 5].map((star) => (
+                    <button
+                        type="button"
+                        key={star}
+                        onClick={() => setPriorityLevel(star)}
+                        aria-label={`Set priority to ${star} stars`}
+                        aria-pressed={priorityLevel === star}
+                        className={star <= priorityLevel ? 'star-active' : ''}
+                    >
+                        ★
+                    </button>
+                ))}
+            </div>
+
+            <span className="priority-level-description">
+                {priorityLevel} out of 5 stars
+            </span>
+        </div>
+    );
+
+    const renderTaskStars = (rating = 3) => {
+        const safeRating = Math.min(5, Math.max(1, rating));
+
+        return (
+            <span
+                className="task-importance-stars"
+                aria-label={`${safeRating} out of 5 priority stars`}
+            >
+                {'★'.repeat(safeRating)}
+                {'☆'.repeat(5 - safeRating)}
+            </span>
+        );
+    };
 
     // =========================================
     // CALENDAR FUNCTIONS
     // =========================================
-
-    const generateCalendarDays = (monthDate) => {
-        const year = monthDate.getFullYear();
-        const month = monthDate.getMonth();
-
-        const firstDay = new Date(year, month, 1);
-        const startingDay = firstDay.getDay();
-        const daysInMonth = new Date(year, month + 1, 0).getDate();
-
-        const days = [];
-
-        for (let i = 0; i < startingDay; i++) {
-            days.push({
-                date: new Date(year, month, i - startingDay + 1),
-                currentMonth: false
-            });
-        }
-
-        for (let day = 1; day <= daysInMonth; day++) {
-            days.push({
-                date: new Date(year, month, day),
-                currentMonth: true
-            });
-        }
-
-        while (days.length < 42) {
-            const nextDay = days.length - startingDay - daysInMonth + 1;
-
-            days.push({
-                date: new Date(year, month + 1, nextDay),
-                currentMonth: false
-            });
-        }
-
-        return days;
-    };
 
     const calendarDays = generateCalendarDays(visibleMonth);
     const pickerCalendarDays = generateCalendarDays(pickerMonth);
@@ -225,22 +332,9 @@ function App() {
         setCalendarOpen(false);
     };
 
-
     // =========================================
-    // TASK FILTERING AND STATISTICS
+    // TASK STATISTICS
     // =========================================
-
-    const getTasksForDate = (date) => {
-        return todos.filter((todo) => {
-            if (!todo.date) {
-                return date === today;
-            }
-
-            return todo.date === date;
-        });
-    };
-
-    const selectedDateTasks = getTasksForDate(selectedDate);
 
     const totalTasks = todos.length;
 
@@ -254,10 +348,95 @@ function App() {
 
     const pendingTasks = pendingTaskList.length;
 
-    const hasTasks = (dateString) => {
-        return getTasksForDate(dateString).length > 0;
+    const overdueTasks = pendingTaskList.filter(isOverdue);
+
+    const getTasksForDate = (date) => {
+        return todos.filter((todo) => {
+            if (!todo.date) return date === today;
+            return todo.date === date;
+        });
     };
 
+    const selectedDateTasks = getTasksForDate(selectedDate);
+
+    const hasTasks = (dateString) => (
+        getTasksForDate(dateString).length > 0
+    );
+
+    // =========================================
+    // SEARCH, FILTERING AND SORTING
+    // =========================================
+
+    const filteredTasks = useMemo(() => {
+        let result = [...todos];
+
+        if (searchQuery.trim()) {
+            const query = searchQuery.toLowerCase().trim();
+
+            result = result.filter((todo) =>
+                todo.text.toLowerCase().includes(query)
+            );
+        }
+
+        if (statusFilter === 'completed') {
+            result = result.filter((todo) => todo.completed);
+        } else if (statusFilter === 'pending') {
+            result = result.filter((todo) => !todo.completed);
+        } else if (statusFilter === 'overdue') {
+            result = result.filter(isOverdue);
+        }
+
+        if (priorityFilter !== 'all') {
+            result = result.filter(
+                (todo) => todo.priorityLevel === Number(priorityFilter)
+            );
+        }
+
+        result.sort((a, b) => {
+            if (a.pinned !== b.pinned) {
+                return a.pinned ? -1 : 1;
+            }
+
+            switch (sortBy) {
+                case 'due-date':
+                    return (a.date || '9999-12-31')
+                        .localeCompare(b.date || '9999-12-31');
+
+                case 'priority':
+                    return (b.priorityLevel || 0) -
+                        (a.priorityLevel || 0);
+
+                case 'created':
+                    return new Date(b.createdAt || 0) -
+                        new Date(a.createdAt || 0);
+
+                default:
+                    return 0;
+            }
+        });
+
+        return result;
+    }, [
+        todos,
+        searchQuery,
+        statusFilter,
+        priorityFilter,
+        sortBy
+    ]);
+
+    const clearSearchFilters = () => {
+        setSearchQuery('');
+        setStatusFilter('all');
+        setPriorityFilter('all');
+        setSortBy('default');
+    };
+
+    const hasActiveSearchFilters = (
+        searchQuery !== '' ||
+        statusFilter !== 'all' ||
+        priorityFilter !== 'all' ||
+        sortBy !== 'default'
+    );
 
     // =========================================
     // PRODUCTIVITY REPORT DATE RANGE
@@ -270,7 +449,6 @@ function App() {
         if (exportPeriod === 'weekly') {
             const start = new Date(reportDate);
             const day = start.getDay();
-
             const difference = day === 0 ? -6 : 1 - day;
 
             start.setDate(start.getDate() + difference);
@@ -281,10 +459,10 @@ function App() {
             return { start, end };
         }
 
-        const start = new Date(year, month, 1);
-        const end = new Date(year, month + 1, 0);
-
-        return { start, end };
+        return {
+            start: new Date(year, month, 1),
+            end: new Date(year, month + 1, 0)
+        };
     };
 
     const { start, end } = getReportDateRange();
@@ -314,11 +492,6 @@ function App() {
             (reportCompletedTasks.length / reportTasks.length) * 100
         )
         : 0;
-
-
-    // =========================================
-    // REPORT DISPLAY INFORMATION
-    // =========================================
 
     const reportPeriodTitle = exportPeriod === 'weekly'
         ? `${start.toLocaleDateString('en-US', {
@@ -355,325 +528,21 @@ function App() {
         setReportDate(new Date());
     };
 
-
     // =========================================
-    // CANVAS DRAWING HELPERS
-    // =========================================
-
-    const drawRoundedRect = (ctx, x, y, width, height, radius) => {
-        const r = Math.min(radius, width / 2, height / 2);
-
-        ctx.beginPath();
-        ctx.moveTo(x + r, y);
-        ctx.lineTo(x + width - r, y);
-        ctx.quadraticCurveTo(x + width, y, x + width, y + r);
-        ctx.lineTo(x + width, y + height - r);
-        ctx.quadraticCurveTo(
-            x + width,
-            y + height,
-            x + width - r,
-            y + height
-        );
-        ctx.lineTo(x + r, y + height);
-        ctx.quadraticCurveTo(x, y + height, x, y + height - r);
-        ctx.lineTo(x, y + r);
-        ctx.quadraticCurveTo(x, y, x + r, y);
-        ctx.closePath();
-    };
-
-    const drawWrappedText = (
-        ctx,
-        text,
-        x,
-        y,
-        maxWidth,
-        lineHeight,
-        maxLines = 2
-    ) => {
-        const words = String(text).split(/\s+/);
-        let line = '';
-        let lineCount = 0;
-
-        for (let i = 0; i < words.length; i++) {
-            const testLine = line ? `${line} ${words[i]}` : words[i];
-
-            if (ctx.measureText(testLine).width > maxWidth && line) {
-                ctx.fillText(line, x, y + lineCount * lineHeight);
-                lineCount++;
-
-                if (lineCount >= maxLines) {
-                    return;
-                }
-
-                line = words[i];
-            } else {
-                line = testLine;
-            }
-        }
-
-        if (line && lineCount < maxLines) {
-            ctx.fillText(line, x, y + lineCount * lineHeight);
-        }
-    };
-
-
-    // =========================================
-    // DRAW PRODUCTIVITY CARD
+    // PRODUCTIVITY CANVAS
     // =========================================
 
     const drawProductivityCard = () => {
-        const canvas = reportCanvasRef.current;
-
-        if (!canvas) return;
-
-        const ctx = canvas.getContext('2d');
-
-        if (!ctx) return;
-
-        const width = 1080;
-
-        const displayedTasks = reportCompletedTasks.slice(0, 12);
-
-        const extraTasks = Math.max(
-            0,
-            reportCompletedTasks.length - displayedTasks.length
-        );
-
-        const taskRowHeight = 86;
-
-        const listHeight = displayedTasks.length > 0
-            ? displayedTasks.length * taskRowHeight
-            : 150;
-
-        const height =
-            885 +
-            listHeight +
-            (extraTasks > 0 ? 65 : 0);
-
-        canvas.width = width;
-        canvas.height = height;
-
-        // Background
-        ctx.fillStyle = '#F5F1E8';
-        ctx.fillRect(0, 0, width, height);
-
-        // Main card shadow
-        drawRoundedRect(ctx, 65, 55, 950, height - 110, 34);
-        ctx.fillStyle = '#1C1C1C';
-        ctx.fill();
-
-        // Main card
-        drawRoundedRect(ctx, 50, 40, 950, height - 110, 34);
-        ctx.fillStyle = '#FFFFFF';
-        ctx.fill();
-
-        ctx.lineWidth = 7;
-        ctx.strokeStyle = '#1C1C1C';
-        ctx.stroke();
-
-        // Header accent
-        drawRoundedRect(ctx, 85, 75, 880, 170, 24);
-        ctx.fillStyle = '#F5D547';
-        ctx.fill();
-
-        ctx.lineWidth = 5;
-        ctx.strokeStyle = '#1C1C1C';
-        ctx.stroke();
-
-        // Brand
-        ctx.fillStyle = '#1C1C1C';
-        ctx.font = '900 27px Arial';
-        ctx.fillText('WHAT TO-DO?', 115, 125);
-
-        // Main title
-        ctx.font = '900 58px Arial';
-        ctx.fillText('PRODUCTIVITY', 115, 190);
-
-        // Report period
-        ctx.font = 'bold 25px Arial';
-        ctx.fillText(
-            `${exportPeriod.toUpperCase()} REPORT  ·  ${reportPeriodTitle}`,
-            115,
-            225
-        );
-
-        // Completion percentage
-        ctx.font = '900 100px Arial';
-        ctx.fillText(`${reportCompletionRate}%`, 115, 385);
-
-        ctx.font = 'bold 27px Arial';
-        ctx.fillText('COMPLETION RATE', 120, 430);
-
-        // Progress bar background
-        drawRoundedRect(ctx, 115, 460, 790, 28, 14);
-        ctx.fillStyle = '#E8E5DC';
-        ctx.fill();
-
-        // Progress bar fill
-        if (reportCompletionRate > 0) {
-            drawRoundedRect(
-                ctx,
-                115,
-                460,
-                Math.max(28, 790 * reportCompletionRate / 100),
-                28,
-                14
-            );
-
-            ctx.fillStyle = '#F5D547';
-            ctx.fill();
-        }
-
-        // Statistics cards
-        const statY = 530;
-        const statWidth = 245;
-        const statHeight = 125;
-        const statGap = 45;
-
-        const stats = [
-            {
-                label: 'TOTAL TASKS',
-                value: reportTasks.length,
-                color: '#F5D547'
-            },
-            {
-                label: 'COMPLETED',
-                value: reportCompletedTasks.length,
-                color: '#DDF5E5'
-            },
-            {
-                label: 'PENDING',
-                value: reportPendingTasks.length,
-                color: '#FCE5E5'
-            }
-        ];
-
-        stats.forEach((stat, index) => {
-            const x = 115 + index * (statWidth + statGap);
-
-            drawRoundedRect(
-                ctx,
-                x + 8,
-                statY + 8,
-                statWidth,
-                statHeight,
-                20
-            );
-
-            ctx.fillStyle = '#1C1C1C';
-            ctx.fill();
-
-            drawRoundedRect(
-                ctx,
-                x,
-                statY,
-                statWidth,
-                statHeight,
-                20
-            );
-
-            ctx.fillStyle = stat.color;
-            ctx.fill();
-
-            ctx.lineWidth = 5;
-            ctx.strokeStyle = '#1C1C1C';
-            ctx.stroke();
-
-            ctx.fillStyle = '#1C1C1C';
-            ctx.font = '900 45px Arial';
-            ctx.fillText(String(stat.value), x + 22, statY + 58);
-
-            ctx.font = 'bold 18px Arial';
-            ctx.fillText(stat.label, x + 22, statY + 96);
+        drawProductivityCardToCanvas({
+            canvas: reportCanvasRef.current,
+            exportPeriod,
+            reportPeriodTitle,
+            reportCompletionRate,
+            reportTasks,
+            reportCompletedTasks,
+            reportPendingTasks
         });
-
-        // Completed task heading
-        const listStartY = 710;
-
-        ctx.fillStyle = '#1C1C1C';
-        ctx.font = '900 30px Arial';
-        ctx.fillText('COMPLETED TASKS', 115, listStartY);
-
-        ctx.font = 'bold 19px Arial';
-        ctx.fillStyle = '#777777';
-
-        ctx.fillText(
-            `${reportCompletedTasks.length} TASKS COMPLETED`,
-            115,
-            listStartY + 35
-        );
-
-        if (displayedTasks.length === 0) {
-            ctx.fillStyle = '#777777';
-            ctx.font = 'bold 25px Arial';
-
-            ctx.fillText(
-                'No completed tasks in this period yet.',
-                115,
-                listStartY + 105
-            );
-        } else {
-            displayedTasks.forEach((task, index) => {
-                const y = listStartY + 75 + index * taskRowHeight;
-
-                // Task row
-                drawRoundedRect(ctx, 115, y, 790, 65, 16);
-
-                ctx.fillStyle = '#F5F1E8';
-                ctx.fill();
-
-                ctx.lineWidth = 3;
-                ctx.strokeStyle = '#1C1C1C';
-                ctx.stroke();
-
-                // Completed status label — no checkbox graphic
-                drawRoundedRect(ctx, 130, y + 15, 135, 35, 12);
-
-                ctx.fillStyle = '#DDF5E5';
-                ctx.fill();
-
-                ctx.lineWidth = 2;
-                ctx.strokeStyle = '#1C1C1C';
-                ctx.stroke();
-
-                ctx.fillStyle = '#16803C';
-                ctx.font = 'bold 15px Arial';
-                ctx.fillText('COMPLETED', 145, y + 38);
-
-                // Task name
-                ctx.fillStyle = '#1C1C1C';
-                ctx.font = 'bold 23px Arial';
-
-                drawWrappedText(
-                    ctx,
-                    task.text,
-                    290,
-                    y + 28,
-                    570,
-                    27,
-                    2
-                );
-            });
-        }
-
-        if (extraTasks > 0) {
-            ctx.fillStyle = '#303030';
-            ctx.font = 'bold 21px Arial';
-
-            ctx.fillText(
-                `+ ${extraTasks} more completed tasks`,
-                115,
-                listStartY + 75 + displayedTasks.length * taskRowHeight
-            );
-        }
-
-        // No author credit or extra footer on the report card.
     };
-
-
-    // =========================================
-    // UPDATE CANVAS PREVIEW
-    // =========================================
 
     useEffect(() => {
         if (showExport) {
@@ -684,19 +553,19 @@ function App() {
         exportPeriod,
         reportDate,
         todos,
-        reportCompletionRate
+        reportCompletionRate,
+        reportPendingTasks.length,
+        reportCompletedTasks.length
     ]);
 
-
     // =========================================
-    // DOWNLOAD PRODUCTIVITY CARD
+    // DOWNLOAD PRODUCTIVITY REPORT
     // =========================================
 
     const downloadProductivityCard = () => {
         drawProductivityCard();
 
         const canvas = reportCanvasRef.current;
-
         if (!canvas) return;
 
         canvas.toBlob((blob) => {
@@ -716,7 +585,6 @@ function App() {
         }, 'image/png');
     };
 
-
     // =========================================
     // VIEW NAVIGATION
     // =========================================
@@ -724,6 +592,7 @@ function App() {
     const openDashboard = () => {
         setActiveView('dashboard');
         setCalendarOpen(false);
+        setShowSearchTools(false);
     };
 
     const openTasks = () => {
@@ -731,6 +600,105 @@ function App() {
         setShowExport(false);
     };
 
+    // =========================================
+    // TASK FORM
+    // =========================================
+
+    const renderTaskForm = (dateForNewTask = dueDate) => (
+        <>
+            <input
+                type="text"
+                placeholder="Add a new task..."
+                value={input}
+                onChange={(event) => setInput(event.target.value)}
+                onKeyDown={(event) => {
+                    if (event.key === 'Enter') {
+                        handleTaskSubmit(dateForNewTask);
+                    }
+                }}
+                aria-label="Task name"
+            />
+
+            {renderPrioritySelector()}
+
+            <button
+                type="button"
+                onClick={() => handleTaskSubmit(dateForNewTask)}
+                disabled={!input.trim()}
+            >
+                {editingTaskId !== null ? 'Save Changes' : 'Add Task'}
+            </button>
+
+            {editingTaskId !== null && (
+                <button
+                    type="button"
+                    onClick={resetTaskForm}
+                >
+                    Cancel Editing
+                </button>
+            )}
+        </>
+    );
+
+    // =========================================
+    // TASK CARD ACTIONS
+    // =========================================
+
+    const renderTaskActions = (todo) => (
+        <div className="home-task-actions">
+            <button
+                type="button"
+                onClick={() => toggleTask(todo.id)}
+            >
+                {todo.completed ? 'Undo' : 'Complete'}
+            </button>
+
+            <button
+                type="button"
+                onClick={() => startEditingTask(todo)}
+            >
+                Edit
+            </button>
+
+            <button
+                type="button"
+                onClick={() => togglePin(todo.id)}
+            >
+                {todo.pinned ? 'Unpin' : 'Pin'}
+            </button>
+
+            <button
+                type="button"
+                onClick={() => deleteTask(todo.id)}
+            >
+                Delete
+            </button>
+        </div>
+    );
+
+    const renderTaskDetails = (todo) => (
+        <>
+            <span className={`task-text ${todo.completed ? 'completed' : ''}`}>
+                {todo.text}
+            </span>
+
+            <p>
+                Due: {formatDisplayDate(todo.date)}
+                {' · '}
+                Priority Level
+            </p>
+
+            {renderTaskStars(todo.priorityLevel)}
+
+            {isOverdue(todo) && (
+                <span className="overdue-label">OVERDUE</span>
+            )}
+
+            {todo.pinned && (
+                <span className="pinned-label">📌 PINNED</span>
+            )}
+        </>
+    );
 
     // =========================================
     // MAIN UI
@@ -742,7 +710,6 @@ function App() {
             {/* HEADER */}
 
             <header className="app-header">
-
                 <img
                     src="/logo.svg"
                     alt="What To-Do calendar logo"
@@ -753,19 +720,23 @@ function App() {
                     <h1>WHAT TO-DO?</h1>
                 </div>
 
-                <div className="header-spacer" aria-hidden="true"></div>
+                <div className="header-spacer"></div>
 
                 <p>Organize your day, one task at a time.</p>
-
             </header>
 
+            {storageError && (
+                <div className="storage-error" role="alert">
+                    Warning: Your tasks could not be saved. Your browser
+                    storage may be full or unavailable. Please back up
+                    your tasks before closing the page.
+                </div>
+            )}
 
-            {/* VIEW NAVIGATION */}
+            {/* NAVIGATION */}
 
             <div className="view-navigation">
-
                 {activeView === 'tasks' ? (
-
                     <button
                         type="button"
                         className="dashboard-toggle-button"
@@ -775,9 +746,7 @@ function App() {
                         Productivity Dashboard
                         <span>→</span>
                     </button>
-
                 ) : (
-
                     <button
                         type="button"
                         className="back-to-tasks-button"
@@ -786,31 +755,17 @@ function App() {
                         <span>←</span>
                         Back to My Tasks
                     </button>
-
                 )}
-
             </div>
 
-
-            {/* =========================================
-                MAIN TASK PAGE
-            ========================================= */}
+            {/* MAIN TASK PAGE */}
 
             {activeView === 'tasks' && (
-
                 <section className="todo-section">
 
                     <div className="todo-form">
 
-                        <input
-                            type="text"
-                            placeholder="Add a new task..."
-                            value={input}
-                            onChange={(e) => setInput(e.target.value)}
-                            onKeyDown={(e) => {
-                                if (e.key === 'Enter') addTask();
-                            }}
-                        />
+                        {renderTaskForm()}
 
                         {/* CUSTOM DATE PICKER */}
 
@@ -820,6 +775,7 @@ function App() {
                                 type="button"
                                 className="date-picker-trigger"
                                 onClick={() => setCalendarOpen(!calendarOpen)}
+                                aria-expanded={calendarOpen}
                             >
                                 <span>📅</span>
                                 <span>{formatDisplayDate(dueDate)}</span>
@@ -827,7 +783,6 @@ function App() {
                             </button>
 
                             {calendarOpen && (
-
                                 <div className="custom-calendar">
 
                                     <div className="calendar-header">
@@ -871,10 +826,9 @@ function App() {
                                     </div>
 
                                     <div className="calendar-days">
-
                                         {pickerCalendarDays.map((item) => {
-
                                             const dateString = formatDate(item.date);
+                                            const dayHasTasks = hasTasks(dateString);
 
                                             return (
                                                 <button
@@ -885,24 +839,21 @@ function App() {
                                                         !item.currentMonth && 'outside-month',
                                                         dateString === today && 'today',
                                                         dateString === dueDate && 'selected',
-                                                        hasTasks(dateString) && 'has-task'
+                                                        dayHasTasks && 'has-task'
                                                     ].filter(Boolean).join(' ')}
                                                     onClick={() => selectDueDate(item.date)}
                                                 >
                                                     {item.date.getDate()}
 
-                                                    {hasTasks(dateString) && (
+                                                    {dayHasTasks && (
                                                         <span className="task-indicator"></span>
                                                     )}
-
                                                 </button>
                                             );
                                         })}
-
                                     </div>
 
                                     <div className="calendar-footer">
-
                                         <button
                                             type="button"
                                             onClick={() => selectDueDate(new Date())}
@@ -919,108 +870,109 @@ function App() {
                                         >
                                             Clear date
                                         </button>
-
                                     </div>
 
                                 </div>
-
                             )}
 
                         </div>
 
+                    </div>
+
+                    {/* SEARCH AND MANAGE TASKS */}
+
+                    <div className="search-tools-launcher">
+
+                        <div>
+                            <span className="section-label">
+                                TASK MANAGEMENT
+                            </span>
+
+                            <h3>Search & Manage Tasks</h3>
+
+                            <p>
+                                Find tasks, filter your list and change the order.
+                            </p>
+                        </div>
+
                         <button
                             type="button"
-                            onClick={() => addTask()}
+                            className="search-tools-toggle-button"
+                            onClick={() => setShowSearchTools(!showSearchTools)}
+                            aria-expanded={showSearchTools}
                         >
-                            Add Task
+                            {showSearchTools
+                                ? 'Close Search Tools ↑'
+                                : 'Open Search Tools ↓'}
                         </button>
 
                     </div>
 
+                    {/* SEARCH AND FILTER PANEL */}
+
+                    {showSearchTools && (
+                        <TaskSearch
+                            searchQuery={searchQuery}
+                            setSearchQuery={setSearchQuery}
+                            statusFilter={statusFilter}
+                            setStatusFilter={setStatusFilter}
+                            priorityFilter={priorityFilter}
+                            setPriorityFilter={setPriorityFilter}
+                            sortBy={sortBy}
+                            setSortBy={setSortBy}
+                            onClearFilters={clearSearchFilters}
+                            hasActiveSearchFilters={hasActiveSearchFilters}
+                            resultCount={filteredTasks.length}
+                        />
+                    )}
 
                     {/* ALL TASKS */}
 
                     <div className="todo-list">
 
-                        <h2>Your Tasks ({todos.length})</h2>
+                        <h2>Your Tasks ({filteredTasks.length})</h2>
 
-                        <ul>
+                        {filteredTasks.length > 0 ? (
+                            <ul>
+                                {filteredTasks.map((todo) => (
+                                    <li
+                                        key={todo.id}
+                                        className={[
+                                            todo.pinned && 'pinned-task',
+                                            todo.completed && 'task-completed',
+                                            isOverdue(todo) && 'overdue-task'
+                                        ].filter(Boolean).join(' ')}
+                                    >
+                                        <div>
+                                            {renderTaskDetails(todo)}
+                                        </div>
 
-                            {todos.map((todo) => (
-
-                                <li key={todo.id}>
-
-                                    <div>
-
-                                        <span
-                                            style={{
-                                                textDecoration: todo.completed
-                                                    ? 'line-through'
-                                                    : 'none',
-                                                color: todo.completed
-                                                    ? '#999999'
-                                                    : '#1C1C1C'
-                                            }}
-                                        >
-                                            {todo.text}
-                                        </span>
-
-                                        <p>
-                                            Due: {todo.date
-                                                ? formatDisplayDate(todo.date)
-                                                : 'Due Today'}
-                                        </p>
-
-                                    </div>
-
-                                    <div className="home-task-actions">
-
-                                        <button
-                                            type="button"
-                                            onClick={() => toggleTask(todo.id)}
-                                        >
-                                            {todo.completed ? 'Undo' : 'Complete'}
-                                        </button>
-
-                                        <button
-                                            type="button"
-                                            onClick={() => deleteTask(todo.id)}
-                                        >
-                                            Delete
-                                        </button>
-
-                                    </div>
-
-                                </li>
-
-                            ))}
-
-                        </ul>
-
-                        {todos.length === 0 && (
-                            <p>No tasks yet. Add your first task!</p>
+                                        {renderTaskActions(todo)}
+                                    </li>
+                                ))}
+                            </ul>
+                        ) : (
+                            <p>
+                                {todos.length === 0
+                                    ? 'No tasks yet. Add your first task!'
+                                    : 'No tasks match your search or filters.'}
+                            </p>
                         )}
 
                     </div>
 
                 </section>
-
             )}
 
-
-            {/* =========================================
-                PRODUCTIVITY DASHBOARD
-            ========================================= */}
+            {/* PRODUCTIVITY DASHBOARD */}
 
             {activeView === 'dashboard' && (
-
                 <section className="dashboard-section">
 
                     <div className="dashboard-heading">
                         <h2>Your Productivity Dashboard</h2>
                         <p>Plan your month. Stay on track.</p>
                     </div>
-
 
                     {/* PRODUCTIVITY EXPORT LAUNCHER */}
 
@@ -1034,7 +986,7 @@ function App() {
                             <h3>Share your productivity</h3>
 
                             <p>
-                                Turn your completed tasks into a report card.
+                                Turn your completed and pending tasks into a report.
                             </p>
                         </div>
 
@@ -1053,15 +1005,12 @@ function App() {
 
                     </div>
 
-
-                    {/* PRODUCTIVITY EXPORT SECTION */}
+                    {/* PRODUCTIVITY REPORT */}
 
                     {showExport && (
-
                         <section className="productivity-export-section">
 
                             <div className="productivity-export-heading">
-
                                 <div>
                                     <span className="section-label">
                                         PRODUCTIVITY REPORT
@@ -1073,20 +1022,7 @@ function App() {
                                         Choose a period and download your productivity card.
                                     </p>
                                 </div>
-
-                                {/* <button
-                                    type="button"
-                                    className="export-close-button"
-                                    onClick={() => setShowExport(false)}
-                                    aria-label="Close productivity report"
-                                >
-                                    ×
-                                </button> */}
-
                             </div>
-
-
-                            {/* PERIOD SELECTOR */}
 
                             <div className="export-period-selector">
 
@@ -1107,9 +1043,6 @@ function App() {
                                 </button>
 
                             </div>
-
-
-                            {/* PERIOD NAVIGATION */}
 
                             <div className="export-period-navigation">
 
@@ -1139,9 +1072,6 @@ function App() {
 
                             </div>
 
-
-                            {/* REPORT SUMMARY */}
-
                             <div className="export-summary-grid">
 
                                 <div className="export-summary-card">
@@ -1166,28 +1096,19 @@ function App() {
 
                             </div>
 
-
-                            {/* CANVAS PREVIEW */}
-
                             <div className="productivity-preview-heading">
                                 <h3>Card Preview</h3>
-
                                 <span>PNG · HIGH RESOLUTION</span>
                             </div>
 
                             <div className="productivity-canvas-container">
-
                                 <canvas
                                     ref={reportCanvasRef}
                                     className="productivity-canvas"
                                     role="img"
                                     aria-label={`Productivity report for ${reportPeriodTitle}`}
                                 />
-
                             </div>
-
-
-                            {/* DOWNLOAD BUTTON */}
 
                             <button
                                 type="button"
@@ -1198,14 +1119,12 @@ function App() {
                             </button>
 
                             <p className="export-note">
-                                Your report includes tasks scheduled during the selected period.
-                                Only completed tasks appear in the completed-task list.
+                                The report includes both completed and pending
+                                tasks scheduled during the selected period.
                             </p>
 
                         </section>
-
                     )}
-
 
                     {/* TASK STATISTICS */}
 
@@ -1239,15 +1158,18 @@ function App() {
 
                     </div>
 
+                    {/* OVERDUE SUMMARY */}
+
+                    <div className="overdue-summary">
+                        <strong>Overdue Tasks: {overdueTasks.length}</strong>
+                    </div>
 
                     {/* PENDING TASKS PANEL */}
 
                     {showPendingTasks && (
-
                         <div className="pending-tasks-panel">
 
                             <div className="pending-panel-heading">
-
                                 <div>
                                     <span className="section-label">
                                         NEEDS YOUR ATTENTION
@@ -1259,42 +1181,33 @@ function App() {
                                 <span className="pending-count">
                                     {pendingTasks} LEFT
                                 </span>
-
                             </div>
 
                             {pendingTaskList.length > 0 ? (
-
                                 <div className="pending-task-list">
-
                                     {pendingTaskList.map((todo) => (
-
                                         <div
                                             className="pending-task-item"
                                             key={todo.id}
                                         >
-
                                             <div className="pending-task-information">
-
                                                 <div>
                                                     <span className="pending-task-name">
                                                         {todo.text}
                                                     </span>
 
                                                     <p>
-                                                        Due: {todo.date
-                                                            ? formatDisplayDate(todo.date)
-                                                            : 'Due Today'}
+                                                        Due: {formatDisplayDate(todo.date)}
                                                         {' · '}
-                                                        {todo.priority || 'Medium'} Priority
-                                                        {' · '}
-                                                        {todo.category || 'Personal'}
+                                                        Priority: {todo.priorityLevel}/5 Stars
+                                                        {isOverdue(todo) ? ' · OVERDUE' : ''}
                                                     </p>
-                                                </div>
 
+                                                    {renderTaskStars(todo.priorityLevel)}
+                                                </div>
                                             </div>
 
                                             <div className="pending-task-actions">
-
                                                 <button
                                                     type="button"
                                                     onClick={() => toggleTask(todo.id)}
@@ -1304,31 +1217,36 @@ function App() {
 
                                                 <button
                                                     type="button"
+                                                    onClick={() => startEditingTask(todo)}
+                                                >
+                                                    Edit
+                                                </button>
+
+                                                <button
+                                                    type="button"
+                                                    onClick={() => togglePin(todo.id)}
+                                                >
+                                                    {todo.pinned ? 'Unpin' : 'Pin'}
+                                                </button>
+
+                                                <button
+                                                    type="button"
                                                     onClick={() => deleteTask(todo.id)}
                                                 >
                                                     Delete
                                                 </button>
-
                                             </div>
-
                                         </div>
-
                                     ))}
-
                                 </div>
-
                             ) : (
-
                                 <div className="no-pending-tasks">
                                     <p>No pending tasks right now.</p>
                                 </div>
-
                             )}
 
                         </div>
-
                     )}
-
 
                     {/* MONTHLY CALENDAR */}
 
@@ -1351,7 +1269,6 @@ function App() {
                             </div>
 
                             <div className="month-navigation">
-
                                 <button
                                     type="button"
                                     onClick={() => changeMonth(-1)}
@@ -1367,32 +1284,25 @@ function App() {
                                 >
                                     ›
                                 </button>
-
                             </div>
 
                         </div>
 
-
                         <div className="dashboard-weekdays">
-
                             {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(
                                 (day) => (
                                     <span key={day}>{day}</span>
                                 )
                             )}
-
                         </div>
 
-
                         <div className="dashboard-calendar-grid">
-
                             {calendarDays.map((item) => {
-
                                 const dateString = formatDate(item.date);
 
                                 const isToday = dateString === today;
                                 const isSelected = dateString === selectedDate;
-                                const hasTask = hasTasks(dateString);
+                                const dayHasTasks = hasTasks(dateString);
 
                                 return (
                                     <button
@@ -1403,26 +1313,21 @@ function App() {
                                             !item.currentMonth && 'outside-month',
                                             isToday && 'today',
                                             isSelected && 'selected',
-                                            hasTask && 'has-task'
+                                            dayHasTasks && 'has-task'
                                         ].filter(Boolean).join(' ')}
                                         onClick={() => selectDate(item.date)}
                                     >
-
                                         <span>{item.date.getDate()}</span>
 
-                                        {hasTask && (
+                                        {dayHasTasks && (
                                             <span className="dashboard-task-indicator"></span>
                                         )}
-
                                     </button>
                                 );
                             })}
-
                         </div>
 
-
                         <div className="calendar-legend">
-
                             <span>
                                 <span className="legend-today"></span>
                                 Today
@@ -1432,70 +1337,41 @@ function App() {
                                 <span className="legend-task"></span>
                                 Has tasks
                             </span>
-
                         </div>
 
                     </div>
-
 
                     {/* SELECTED DATE TASKS */}
 
                     <div className="selected-day-tasks">
 
                         <div className="selected-date-heading">
-
                             <div>
                                 <span className="section-label">YOUR SCHEDULE</span>
-
                                 <h2>{formatDisplayDate(selectedDate)}</h2>
                             </div>
 
                             <span className="selected-task-count">
                                 {selectedDateTasks.length} TASKS
                             </span>
-
                         </div>
 
-
-                        {/* ADD TASK FORM */}
+                        {/* DASHBOARD TASK FORM */}
 
                         <div className="dashboard-task-form">
-
-                            <input
-                                type="text"
-                                placeholder="What do you need to do?"
-                                value={input}
-                                onChange={(e) => setInput(e.target.value)}
-                                onKeyDown={(e) => {
-                                    if (e.key === 'Enter') {
-                                        addTask(selectedDate);
-                                    }
-                                }}
-                            />
-
-                            <button
-                                type="button"
-                                onClick={() => addTask(selectedDate)}
-                            >
-                                + Add Task
-                            </button>
-
+                            {renderTaskForm(selectedDate)}
                         </div>
-
 
                         {/* SELECTED DATE TASK LIST */}
 
                         <div className="dashboard-task-list">
 
                             {selectedDateTasks.length > 0 ? (
-
                                 selectedDateTasks.map((todo) => (
-
                                     <div
                                         className={`dashboard-task-item ${todo.completed ? 'task-completed' : ''}`}
                                         key={todo.id}
                                     >
-
                                         <div className="task-information">
 
                                             <button
@@ -1512,33 +1388,49 @@ function App() {
                                                 </span>
 
                                                 <p>
-                                                    {todo.priority || 'Medium'} Priority
-                                                    {' · '}
-                                                    {todo.category || 'Personal'}
+                                                    Priority Level: {todo.priorityLevel}/5
                                                 </p>
-                                            </div>
 
+                                                {renderTaskStars(todo.priorityLevel)}
+
+                                                {isOverdue(todo) && (
+                                                    <span className="overdue-label">
+                                                        OVERDUE
+                                                    </span>
+                                                )}
+                                            </div>
                                         </div>
 
-                                        <button
-                                            type="button"
-                                            className="task-delete-button"
-                                            onClick={() => deleteTask(todo.id)}
-                                        >
-                                            Delete
-                                        </button>
+                                        <div className="dashboard-task-actions">
+                                            <button
+                                                type="button"
+                                                onClick={() => startEditingTask(todo)}
+                                            >
+                                                Edit
+                                            </button>
 
+                                            <button
+                                                type="button"
+                                                onClick={() => togglePin(todo.id)}
+                                            >
+                                                {todo.pinned ? 'Unpin' : 'Pin'}
+                                            </button>
+
+                                            <button
+                                                type="button"
+                                                className="task-delete-button"
+                                                onClick={() => deleteTask(todo.id)}
+                                            >
+                                                Delete
+                                            </button>
+                                        </div>
                                     </div>
-
                                 ))
-
                             ) : (
-
                                 <div className="empty-day-message">
                                     <h3>No tasks scheduled</h3>
                                     <p>Add a task for this date to get started.</p>
                                 </div>
-
                             )}
 
                         </div>
@@ -1546,14 +1438,11 @@ function App() {
                     </div>
 
                 </section>
-
             )}
-
 
             {/* FOOTER */}
 
             <footer className="app-footer">
-
                 <p>
                     © {new Date().getFullYear()} <strong>WHAT TO-DO?</strong>
                     <span> — Organize. Prioritize. Accomplish.</span>
@@ -1562,7 +1451,6 @@ function App() {
                 <p className="footer-credit">
                     Made by <strong>Tapoborata Roy.</strong>
                 </p>
-
             </footer>
 
         </main>
