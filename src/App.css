@@ -3041,7 +3041,7 @@ body {
 }
 
 /* COMMON SURFACES */
-.todo-section,
+/* .todo-section,
 .todo-list,
 .monthly-calendar-card,
 .selected-day-tasks,
@@ -3051,7 +3051,7 @@ body {
 .custom-calendar {
     background-color: var(--theme-surface);
     color: var(--theme-text);
-}
+} */
 
 /* TEXT */
 .app-container h1,
@@ -3264,6 +3264,7 @@ body {
 }
 
 @media (prefers-reduced-motion: reduce) {
+
     .theme-switch-thumb,
     .theme-switch-track,
     html,
@@ -3271,6 +3272,7 @@ body {
         transition: none !important;
     }
 }
+
 /* DESKTOP — FIX THEME TOGGLE POSITION */
 @media (min-width: 901px) {
     .app-header {
@@ -3301,4 +3303,88 @@ body {
         justify-content: center;
         align-items: center;
     }
+}
+
+/* ==========================================
+   SECTION COLOR DIFFERENTIATION
+   WHAT TO-DO? — Neobrutalist Theme
+   ========================================== */
+
+/* 1. Main App Background — Ivory */
+.app {
+    background-color: #F5F1E8;
+}
+
+/* 2. Your Tasks / To-Do List — Muted Sage */
+.todo-list {
+    background-color: #E4EBDD;
+}
+
+/* 3. Calendar Section — Warm Beige */
+.monthly-calendar-card {
+    background-color: #E8DFC9;
+}
+
+/* 4. Selected Day Tasks — Soft Lavender */
+.selected-day-tasks {
+    background-color: #E8E1F2;
+}
+
+/* 5. Search & Filter Controls — Pale Yellow */
+.task-controls-panel {
+    background-color: #F8EFBF;
+}
+
+/* 6. Productivity Export Section — Soft Blue */
+.productivity-export-section {
+    background-color: #E2ECF7;
+}
+
+/* 7. Priority Selector — Warm Beige */
+.priority-level-selector {
+    background-color: #E8DFC9;
+}
+/* ==========================================
+   DASHBOARD EDIT & PIN BUTTONS
+   MATCH EXISTING NEO-BRUTALIST THEME
+   ========================================== */
+
+.dashboard-task-item button:not(.task-complete-button):not(.task-delete-button) {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+
+    padding: 8px 12px;
+
+    background: var(--yellow);
+    color: var(--charcoal);
+
+    border: var(--border-thin);
+    border-radius: var(--radius-sm);
+
+    box-shadow: var(--shadow-sm);
+
+    font-family: inherit;
+    font-size: 11px;
+    font-weight: 1000;
+
+    cursor: pointer;
+    white-space: nowrap;
+
+    transition: transform var(--transition),
+                box-shadow var(--transition),
+                background var(--transition);
+}
+
+/* Hover — same interaction as existing buttons */
+.dashboard-task-item button:not(.task-complete-button):not(.task-delete-button):hover {
+    background: var(--yellow-dark);
+    transform: translate(3px, 3px);
+    box-shadow: none;
+}
+
+/* Press */
+.dashboard-task-item button:not(.task-complete-button):not(.task-delete-button):active {
+    transform: translate(4px, 4px);
 }

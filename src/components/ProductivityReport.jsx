@@ -1,4 +1,3 @@
-
 function ProductivityReport({
   exportPeriod,
   onChangePeriod,
@@ -20,6 +19,14 @@ function ProductivityReport({
       </div>
 
       <div className="export-period-selector">
+        <button
+          type="button"
+          className={exportPeriod === 'daily' ? 'active' : ''}
+          onClick={() => onChangePeriod('daily')}
+        >
+          Daily
+        </button>
+
         <button
           type="button"
           className={exportPeriod === 'weekly' ? 'active' : ''}
