@@ -1,12 +1,12 @@
-# 📝 What To-Do? — Task Management Application
+# 📝 What To-Do? — Full-Stack Task Management Application
 
 ### Organize. Prioritize. Accomplish.
 
 Turn everyday tasks into organized progress, one task at a time.
 
-**What To-Do?** is a responsive task management application designed to help users organize their daily activities, keep track of deadlines, and manage task completion through a simple and intuitive interface.
+**What To-Do?** is a responsive full-stack task management application designed to help users organize their daily activities, keep track of deadlines, and manage task completion through a simple and intuitive interface.
 
-Built with **React 19** and powered by **Vite**, the application combines essential task management functionality with a bold Neobrutalism-inspired design. Tasks are automatically saved in the browser using localStorage, allowing users to retain their task lists even after refreshing the page.
+Built with **React 19** and powered by **Vite**, the application combines essential task management functionality with a bold Neobrutalism-inspired design. The frontend communicates with a backend API to manage tasks, while **MongoDB** provides persistent database storage, allowing task data to be stored beyond the browser's local storage.
 
 🌐 **Live Website:** [Visit What To-Do?](https://what-to-do-bice.vercel.app/)
 
@@ -20,7 +20,8 @@ Built with **React 19** and powered by **Vite**, the application combines essent
 - 📅 **Due Date Management** — Assign a due date to each task to keep track of deadlines.
 - ✅ **Task Completion Tracking** — Mark tasks as completed or undo their completion status.
 - 🗑️ **Task Deletion** — Remove tasks that are no longer needed.
-- 💾 **Local Storage Persistence** — Automatically saves tasks in the browser using localStorage.
+- 🗄️ **MongoDB Database Integration** — Stores task data in a database for persistent data management.
+- 🔗 **Backend API Integration** — Connects the React frontend with the backend to perform task management operations.
 - 🔢 **Dynamic Task Counter** — Displays the total number of tasks in the task list.
 - 📌 **Default Due Date Display** — Displays "Due Today" when a task is created without selecting a due date.
 - 📱 **Responsive Interface** — Adapts the layout for desktop, tablet, and mobile screens.
@@ -31,15 +32,18 @@ Built with **React 19** and powered by **Vite**, the application combines essent
 
 ## 🛠️ Tech Stack
 
-| Technology           | Purpose                                      |
-| -------------------- | -------------------------------------------- |
-| React 19             | Component-based frontend development         |
-| JavaScript (ES6+)    | Application logic and task management        |
-| Vite 8               | Development server and production build tool |
-| CSS3                 | Styling, responsive layouts, and UI design   |
-| HTML5                | Application structure                        |
-| Browser localStorage | Persistent task data storage                 |
-| Vercel               | Deployment and hosting                       |
+| Technology | Purpose |
+|---|---|
+| React 19 | Component-based frontend development |
+| JavaScript (ES6+) | Application logic and task management |
+| Vite 8 | Development server and production build tool |
+| Node.js | Backend runtime environment |
+| Express.js | Backend server and API development |
+| MongoDB | Database for persistent task storage |
+| REST API | Communication between frontend and backend |
+| CSS3 | Styling, responsive layouts, and UI design |
+| HTML5 | Application structure |
+| Vercel | Deployment and hosting |
 
 ---
 
@@ -49,20 +53,32 @@ Built with **React 19** and powered by **Vite**, the application combines essent
 What-TO-DO-/
 │
 ├── public/
-│   ├── logo.svg              # Application logo
-│   └── favicon.svg           # Website favicon
+│   ├── logo.svg
+│   └── favicon.svg
 │
 ├── src/
-│   ├── App.jsx               # Main application and task logic
-│   ├── App.css               # Application styling and responsive UI
-│   ├── index.css             # Global CSS reset and styles
-│   └── main.jsx              # React application entry point
+│   ├── App.jsx
+│   ├── App.css
+│   ├── index.css
+│   └── main.jsx
 │
-├── index.html                # HTML entry point
-├── package.json              # Dependencies and scripts
-├── package-lock.json         # Dependency lock file
-├── vite.config.js            # Vite configuration
-└── .gitignore                # Git ignored files
+├── backend/
+│   ├── config/
+│   │   └── database.js
+│   ├── models/
+│   │   └── Task.js
+│   ├── routes/
+│   │   └── taskRoutes.js
+│   ├── controllers/
+│   │   └── taskController.js
+│   ├── server.js
+│   └── package.json
+│
+├── index.html
+├── package.json
+├── package-lock.json
+├── vite.config.js
+└── .gitignore
 ```
 
 ---
@@ -71,15 +87,17 @@ What-TO-DO-/
 
 ### 1️⃣ Application Initialization
 
-- React initializes the application through the main entry point.
+- React initializes the frontend application through the main entry point.
 - Vite provides the development environment and production build system.
 - The main application component manages the task interface and application state.
+- The backend server handles incoming API requests from the frontend.
 
 ### 2️⃣ Task Creation
 
 - Users enter a task in the input field.
 - An optional due date can be selected using the date input.
-- The application creates a new task with a unique identifier and an initial pending status.
+- The frontend sends a request to the backend API to create a new task.
+- The backend processes the request and stores the task in MongoDB.
 - Empty task submissions are prevented.
 
 ### 3️⃣ Task Management
@@ -87,14 +105,17 @@ What-TO-DO-/
 - Newly created tasks appear in the task list.
 - Users can mark tasks as completed or undo their completion status.
 - Tasks can be deleted when they are no longer required.
+- Task updates and deletions are processed through the backend API.
 - The task counter updates dynamically as tasks are added or removed.
 
 ### 4️⃣ Data Persistence
 
-- React state manages the application's task data.
-- The application uses the browser's localStorage to save the task list.
-- Whenever the task list changes, the updated data is stored automatically.
-- Previously saved tasks are loaded when the application starts, allowing data to remain available after a page refresh.
+- React state manages the application's task data and user interface.
+- The frontend communicates with the backend API to perform task-related operations.
+- The backend handles data operations and communicates with MongoDB.
+- MongoDB stores the task data persistently.
+- Previously stored tasks can be retrieved from the database when the application loads.
+- Task data is no longer dependent solely on the browser's localStorage.
 
 ### 5️⃣ Responsive User Interface
 
@@ -105,7 +126,8 @@ What-TO-DO-/
 ### 6️⃣ Deployment
 
 - Vite generates optimized production files through the build process.
-- The production application is deployed using Vercel.
+- The frontend is deployed using Vercel.
+- The backend and database are configured to support the application's API and persistent data storage.
 - Users can access the application through its live deployment URL.
 
 ---
@@ -119,6 +141,7 @@ Make sure you have the following installed:
 - Node.js
 - npm (Node Package Manager)
 - Git
+- MongoDB database
 
 ### 1. Clone the Repository
 
@@ -132,13 +155,32 @@ git clone https://github.com/tapobrata2002/What-TO-DO-.git
 cd What-TO-DO-
 ```
 
-### 3. Install Dependencies
+### 3. Install Frontend Dependencies
 
 ```bash
 npm install
 ```
 
-### 4. Start the Development Server
+### 4. Configure the Backend
+
+Navigate to the backend directory and install its dependencies.
+
+```bash
+cd backend
+npm install
+```
+
+Configure the required environment variables for the backend, including your MongoDB connection string.
+
+### 5. Start the Backend Server
+
+```bash
+npm run dev
+```
+
+### 6. Start the Frontend Development Server
+
+Open another terminal in the project root directory and run:
 
 ```bash
 npm run dev
@@ -146,13 +188,13 @@ npm run dev
 
 Open the local development URL displayed in your terminal to access the application.
 
-### 5. Build for Production
+### 7. Build for Production
 
 ```bash
 npm run build
 ```
 
-### 6. Preview Production Build
+### 8. Preview Production Build
 
 ```bash
 npm run preview
@@ -162,7 +204,9 @@ npm run preview
 
 ## 🌐 Deployment
 
-The project is deployed using **Vercel**.
+The frontend is deployed using **Vercel**.
+
+The application uses a backend API connected to MongoDB for task management and persistent data storage.
 
 Visit the live application:
 
@@ -178,14 +222,14 @@ Visit the live application:
 - Introduce search, filtering, and sorting options.
 - Add task statistics and completion progress tracking.
 - Implement reminders and deadline notifications.
-- Explore cloud-based data storage and user authentication.
+- Implement user authentication and personalized task management.
 - Continue improving accessibility and the responsive user experience.
 
 ---
 
 ## 🤝 Contribution
 
-This repository serves as a personal project focused on frontend development and practical React application building.
+This repository serves as a personal project focused on full-stack development and practical application building using React, backend APIs, and MongoDB.
 
 Suggestions, feedback, and improvements are welcome.
 
@@ -202,6 +246,7 @@ Frontend Developer | Creative Professional
 - GitHub: [tapobrata2002](https://github.com/tapobrata2002)
 
 ---
+
 ---
 
 ### 📝 WHAT TO-DO?
